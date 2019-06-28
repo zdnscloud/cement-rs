@@ -1,5 +1,5 @@
 [workspace]
 
 members = [ 
-  "failure",
+  "failure_ext",
 ]
