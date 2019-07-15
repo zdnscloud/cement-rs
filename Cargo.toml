@@ -3,4 +3,6 @@
 members = [ 
   "failure_ext",
   "rbtree",
+  "grpc/grpcio-client",
+  "grpc/build_helpers",
 ]
