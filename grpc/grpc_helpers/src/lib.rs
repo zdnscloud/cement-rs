@@ -6,6 +6,7 @@ use futures::{compat::Future01CompatExt, future::Future, prelude::*};
 use futures_01::future::Future as Future01;
 use grpcio::{EnvBuilder, ServerBuilder};
 use std::{
+    str::from_utf8,
     sync::{
         mpsc::{self, Sender},
         Arc,
@@ -101,4 +102,32 @@ pub fn convert_grpc_response<T>(
 
 fn convert_grpc_err(e: ::grpcio::Error) -> Error {
     format_err!("grpc error: {}", e)
+}
+
+pub fn provide_grpc_response<ResponseType: std::fmt::Debug>(
+    resp: Result<ResponseType>,
+    ctx: ::grpcio::RpcContext<'_>,
+    sink: ::grpcio::UnarySink<ResponseType>,
+) {
+    match resp {
+        Ok(resp) => ctx.spawn(sink.success(resp).map_err(default_reply_error_logger)),
+        Err(e) => {
+            let f = sink
+                .fail(create_grpc_invalid_arg_status(
+                    from_utf8(ctx.method()).expect("Unable to convert function name to string"),
+                    e,
+                ))
+                .map_err(default_reply_error_logger);
+            ctx.spawn(f)
+        }
+    }
+}
+
+pub fn create_grpc_invalid_arg_status(method: &str, err: ::failure::Error) -> ::grpcio::RpcStatus {
+    let msg = format!("Request {} failed {}", method, err);
+    ::grpcio::RpcStatus::new(::grpcio::RpcStatusCode::InvalidArgument, Some(msg))
+}
+
+pub fn default_reply_error_logger<T: std::fmt::Debug>(e: T) {
+    println!("Failed to reply error due to {:?}", e)
 }
