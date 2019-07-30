@@ -1,11 +1,7 @@
 use crate::json_encoder::JsonEncoder;
 use crate::never::Never;
-use futures::{future, IntoFuture};
-use hyper::{
-    rt::{self, Future},
-    service::Service,
-    Body, Method, Request, Response, Server, StatusCode,
-};
+use futures::{future, Future, IntoFuture};
+use hyper::{service::Service, Body, Method, Request, Response, Server, StatusCode};
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
 
@@ -65,17 +61,12 @@ fn encode_metrics(encoder: impl Encoder) -> Vec<u8> {
     buffer
 }
 
-pub fn start_server(addr: SocketAddr, path_for_prom: String, path_for_http: String) {
-    rt::run(rt::lazy(move || {
-        match Server::try_bind(&addr) {
-            Ok(srv) => {
-                let srv = srv
-                    .serve(move || MetricServer::new(path_for_prom.clone(), path_for_http.clone()))
-                    .map_err(|e| println!("server error: {}", e));
-                rt::spawn(srv);
-            }
-            Err(e) => println!("Metric server bind error: {}", e),
-        };
-        Ok(())
-    }));
+pub fn start_metric_server(
+    addr: SocketAddr,
+    path_for_prom: String,
+    path_for_http: String,
+) -> impl Future<Item = (), Error = ()> {
+    let srv = Server::try_bind(&addr).unwrap();
+    srv.serve(move || MetricServer::new(path_for_prom.clone(), path_for_http.clone()))
+        .map_err(|e| println!("server error: {}", e))
 }
